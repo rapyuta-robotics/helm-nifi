@@ -65,15 +65,14 @@ spec:
   {{- end }}
   {{- end }}
   ports:
-  {{- if .Values.properties.httpsPort }}
     - port: {{ .Values.service.httpPort }}
+      {{- if .Values.properties.httpsPort }}
       name: https
       targetPort: {{ .Values.properties.httpsPort }}
-  {{- else }}
-    - port: {{ .Values.service.httpPort }}
+      {{- else }}
       name: http
       targetPort: {{ .Values.properties.httpPort }}
-  {{- end }}
+      {{- end }}
       nodePort: {{ .Values.service.nodePort }}
     - port: {{ .Values.properties.siteToSite.port }}
       name: site-to-site
