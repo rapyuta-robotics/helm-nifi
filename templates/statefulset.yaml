@@ -451,7 +451,7 @@ spec:
 {{- end }}
           periodSeconds: 20
           tcpSocket:
-            port: {{ .Values.service.httpsPort | default .Values.service.httpPort }}
+            port: {{ .Values.service.httpPort }}
 #           exec:
 #             command:
 #             - bash

@@ -1,4 +1,4 @@
-{{- $port := (.Values.service.httpsPort | default .Values.service.httpPort) }}
+{{- $port := .Values.service.httpPort }}
 To access the NiFi UI via kubectl port forwarding,
 wait until the cluster is ready and then run:
 
