@@ -256,6 +256,11 @@ ingress:
       #       serviceName: processor02
       #       type: Prefix
 
+traefik:
+  serversTransport:
+    enabled: false
+    insecureSkipVerify: true
+
 # Amount of memory to give the NiFi java heap
 jvmMemory: 2g
 
