@@ -40,9 +40,12 @@ metadata:
     chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
     release: {{ .Release.Name | quote }}
     heritage: {{ .Release.Service | quote }}
-{{- if .Values.service.annotations }}
+{{- if or .Values.service.annotations .Values.traefik.serversTransport.enabled }}
   annotations:
 {{ toYaml .Values.service.annotations | indent 4 }}
+{{- end }}
+{{- if .Values.traefik.serversTransport.enabled }}
+    traefik.ingress.kubernetes.io/service.serversTransport: {{ .Release.Namespace }}-{{ template "apache-nifi.fullname" . }}-transport@kubernetescrd
 {{- end }}
 spec:
   type: {{ .Values.service.type }}
