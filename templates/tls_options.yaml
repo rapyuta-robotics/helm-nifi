@@ -1,0 +1,11 @@
+{{- if .Values.traefik.tlsOptions.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: TLSOption
+metadata:
+  name: {{ template "apache-nifi.fullname" . }}-tls-option
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  maxVersion: {{ .Values.traefik.tlsOptions.maxVersion | default "VersionTLS12" }}
+  minVersion: {{ .Values.traefik.tlsOptions.minVersion | default "VersionTLS12" }}
+{{- end }}

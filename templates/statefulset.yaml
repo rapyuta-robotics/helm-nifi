@@ -137,45 +137,11 @@ spec:
 {{- end }}
 
           cat "${NIFI_HOME}/conf/nifi.temp" > "${NIFI_HOME}/conf/nifi.properties"
+          cat "${NIFI_HOME}/conf/authorizers.temp" > "${NIFI_HOME}/conf/authorizers.xml"
 
 {{- if .Values.auth.ldap.enabled }}
           cat "${NIFI_HOME}/conf/authorizers.temp" > "${NIFI_HOME}/conf/authorizers.xml"
           cat "${NIFI_HOME}/conf/login-identity-providers-ldap.xml" > "${NIFI_HOME}/conf/login-identity-providers.xml"
-{{- else if .Values.auth.oidc.enabled }}
-          prop_replace nifi.security.user.login.identity.provider ''
-          prop_replace nifi.security.user.authorizer managed-authorizer
-          prop_replace nifi.security.user.oidc.discovery.url {{ .Values.auth.oidc.discoveryUrl }}
-          prop_replace nifi.security.user.oidc.client.id {{ .Values.auth.oidc.clientId }}
-          prop_replace nifi.security.user.oidc.client.secret {{ .Values.auth.oidc.clientSecret }}
-          prop_replace nifi.security.user.oidc.claim.identifying.user {{ .Values.auth.oidc.claimIdentifyingUser }}
-          xmlstarlet ed --inplace --delete "//authorizers/authorizer[identifier='single-user-authorizer']" "${NIFI_HOME}/conf/authorizers.xml"
-          xmlstarlet ed --inplace --update "//authorizers/userGroupProvider/property[@name='Users File']" -v './auth-conf/users.xml' "${NIFI_HOME}/conf/authorizers.xml"
-          xmlstarlet ed --inplace --delete "//authorizers/userGroupProvider/property[@name='Initial User Identity 1']" "${NIFI_HOME}/conf/authorizers.xml"
-          xmlstarlet ed --inplace \
-                        --subnode "authorizers/userGroupProvider" --type 'elem' -n 'property' \
-                          --value {{ .Values.auth.oidc.admin | quote }} \
-                        --insert "authorizers/userGroupProvider/property[not(@name)]" --type attr -n name \
-                          --value "Initial User Identity {{ .Values.replicaCount }}" \
-                        "${NIFI_HOME}/conf/authorizers.xml"
-          xmlstarlet ed --inplace --update "//authorizers/accessPolicyProvider/property[@name='Initial Admin Identity']" -v {{ .Values.auth.oidc.admin | quote }} "${NIFI_HOME}/conf/authorizers.xml"
-          xmlstarlet ed --inplace --update "//authorizers/accessPolicyProvider/property[@name='Authorizations File']" -v './auth-conf/authorizations.xml' "${NIFI_HOME}/conf/authorizers.xml"
-          {{- if .Values.properties.isNode }}
-                      xmlstarlet ed --inplace --delete "authorizers/accessPolicyProvider/property[@name='Node Identity 1']" "${NIFI_HOME}/conf/authorizers.xml"
-            {{ range untilStep 0 (int .Values.replicaCount) 1 }}
-                      xmlstarlet ed --inplace \
-                                    --subnode "authorizers/accessPolicyProvider" --type 'elem' -n 'property' \
-                                    --value "CN={{ template "apache-nifi.fullname" $ }}-{{ . }}.{{ template "apache-nifi.fullname" $ }}-headless.{{ $.Release.Namespace }}.svc.{{ $.Values.certManager.clusterDomain }}, OU=NIFI" \
-                                    --insert "authorizers/accessPolicyProvider/property[not(@name)]" --type attr -n name \
-                                    --value "Node Identity {{ . }}" \
-                                    "${NIFI_HOME}/conf/authorizers.xml"
-                      xmlstarlet ed --inplace \
-                                    --subnode "authorizers/userGroupProvider" --type 'elem' -n 'property' \
-                                    --value "CN={{ template "apache-nifi.fullname" $ }}-{{ . }}.{{ template "apache-nifi.fullname" $ }}-headless.{{ $.Release.Namespace }}.svc.{{ $.Values.certManager.clusterDomain }}, OU=NIFI" \
-                                    --insert "authorizers/userGroupProvider/property[not(@name)]" --type attr -n name \
-                                    --value "Initial User Identity {{ . }}" \
-                                    "${NIFI_HOME}/conf/authorizers.xml"
-            {{/* range untilStep 0 (int .Values.replicaCount ) 1 */}}{{ end }}
-          {{- end }}
 {{- else if .Values.auth.clientAuth.enabled }}
           cat "${NIFI_HOME}/conf/authorizers.temp" > "${NIFI_HOME}/conf/authorizers.xml"
           xmlstarlet ed --inplace --delete "//authorizers/authorizer[identifier='single-user-authorizer']" "${NIFI_HOME}/conf/authorizers.xml"
@@ -205,22 +171,6 @@ spec:
 {{- end }}
 
 {{- if .Values.certManager.enabled }}
-          xmlstarlet ed --inplace --delete "authorizers/accessPolicyProvider/property[@name='Node Identity 1']" "${NIFI_HOME}/conf/authorizers.xml"
-{{ range untilStep 0 (int .Values.replicaCount) 1 }}
-          xmlstarlet ed --inplace \
-                        --subnode "authorizers/accessPolicyProvider" --type 'elem' -n 'property' \
-                          --value "CN={{ template "apache-nifi.fullname" $ }}-{{ . }}.{{ template "apache-nifi.fullname" $ }}-headless.{{ $.Release.Namespace }}.svc.{{ $.Values.certManager.clusterDomain }}, OU=NIFI" \
-                        --insert "authorizers/accessPolicyProvider/property[not(@name)]" --type attr -n name \
-                          --value "Node Identity {{ . }}" \
-                        "${NIFI_HOME}/conf/authorizers.xml"
-          xmlstarlet ed --inplace \
-                        --subnode "authorizers/userGroupProvider" --type 'elem' -n 'property' \
-                          --value "CN={{ template "apache-nifi.fullname" $ }}-{{ . }}.{{ template "apache-nifi.fullname" $ }}-headless.{{ $.Release.Namespace }}.svc.{{ $.Values.certManager.clusterDomain }}, OU=NIFI" \
-                        --insert "authorizers/userGroupProvider/property[not(@name)]" --type attr -n name \
-                          --value "Initial User Identity {{ . }}" \
-                        "${NIFI_HOME}/conf/authorizers.xml"
-{{/* range untilStep 0 (int .Values.replicaCount ) 1 */}}{{ end }}
-
           prop_replace nifi.security.keystore "${NIFI_HOME}/tls/keystore.jks"
           prop_replace nifi.security.keystoreType JKS
           prop_replace nifi.security.keystorePasswd "{{ .Values.certManager.keystorePasswd }}"
@@ -299,7 +249,11 @@ spec:
           function offloadNode() {
               FQDN=$(hostname -f)
               echo "disconnecting node '$FQDN'"
+              {{- if .Values.properties.httpsPort }}
               baseUrl=https://${FQDN}:{{ .Values.properties.httpsPort }}
+              {{- else }}
+              baseUrl=http://${FQDN}:{{ .Values.properties.httpPort }}
+              {{- end }}
 
               echo "keystoreType=$(prop nifi.security.keystoreType)" > secure.properties
               echo "keystore=$(prop nifi.security.keystore)" >> secure.properties
@@ -320,7 +274,11 @@ spec:
               echo ""
               echo "get a connected node"
               connectedNode=$(jq -r 'first(.cluster.nodes|=sort_by(.address)| .cluster.nodes[] | select(.status=="CONNECTED")) | .address' nodes.json)
+              {{- if .Values.properties.httpsPort }}
               baseUrl=https://${connectedNode}:{{ .Values.properties.httpsPort }}
+              {{- else }}
+              baseUrl=http://${connectedNode}:{{ .Values.properties.httpPort }}
+              {{- end }}
               echo baseUrl ${baseUrl}
               echo ""
               echo "wait until node has state 'DISCONNECTED'"
@@ -377,6 +335,7 @@ spec:
           name: metrics
           protocol: TCP                  
 {{- end }}
+{{- if .Values.properties.httpsPort }}
         - containerPort: {{ .Values.properties.httpsPort }}
 {{- if .Values.sts.hostPort }}
           hostPort: {{ .Values.sts.hostPort }}
@@ -386,6 +345,32 @@ spec:
         - containerPort: {{ .Values.properties.clusterPort }}
           name: cluster
           protocol: TCP
+{{- else }}
+        - containerPort: {{ .Values.properties.httpPort }}
+{{- if .Values.sts.hostPort }}
+          hostPort: {{ .Values.sts.hostPort }}
+{{- end }}
+          name: http
+          protocol: TCP
+{{- end }}
+{{- if .Values.properties.siteToSite.port }}
+        - containerPort: {{ .Values.properties.siteToSite.port }}
+{{- if .Values.properties.siteToSite.hostPort }}
+          hostPort: {{ .Values.properties.siteToSite.hostPort }}
+{{- end }}
+          name: site-to-site
+          protocol: TCP
+{{- end }}
+{{- if .Values.containerPorts  }}
+{{ toYaml .Values.containerPorts | indent 8 }}
+{{- end }}
+        env:
+        - name: NIFI_ZOOKEEPER_CONNECT_STRING
+          value: {{ template "zookeeper.url" . }}
+{{- if not (or (.Values.auth.ldap.enabled) (.Values.auth.oidc.enabled)) }}
+        - name: NIFI_WEB_HTTPS_HOST
+          value:
+{{- end }}
 {{- if .Values.containerPorts  }}
 {{ toYaml .Values.containerPorts | indent 8 }}
 {{- end }}
@@ -416,7 +401,7 @@ spec:
 {{- end }}
           periodSeconds: 20
           tcpSocket:
-            port: {{ .Values.properties.httpsPort }}
+            port: {{ .Values.service.httpsPort | default .Values.service.httpPort }}
 #           exec:
 #             command:
 #             - bash
@@ -444,7 +429,11 @@ spec:
           failureThreshold: {{ .Values.sts.startupProbe.failureThreshold }}
           periodSeconds: {{ .Values.sts.startupProbe.periodSeconds }}
           tcpSocket:
+          {{- if .Values.properties.httpsPort }}
             port: {{ .Values.properties.httpsPort }}
+          {{- else }}
+            port: {{ .Values.properties.httpPort }}
+          {{- end }}
 {{- end }}
         livenessProbe:
 {{- if not .Values.sts.startupProbe.enabled }}
@@ -452,7 +441,11 @@ spec:
 {{- end }}
           periodSeconds: 60
           tcpSocket:
+          {{- if .Values.properties.httpsPort }}
             port: {{ .Values.properties.httpsPort }}
+          {{- else }}
+            port: {{ .Values.properties.httpPort }}
+          {{- end }}
         volumeMounts:
           - mountPath: /opt/nifi/nifi-current/logs
             {{- if and .Values.persistence.enabled .Values.persistence.subPath.enabled }}
@@ -527,6 +520,9 @@ spec:
           - name: "flow-content"
             mountPath: /opt/nifi/data/flow.xml
             subPath: "flow.xml"
+          - name: "logback-xml"
+            mountPath: /opt/nifi/nifi-current/conf/logback.xml
+            subPath: "logback.xml"
           {{- range $secret := .Values.secrets }}
             {{- if $secret.mountPath }}
               {{- if $secret.keys }}
@@ -798,6 +794,12 @@ spec:
           items:
             - key: "flow.xml"
               path: "flow.xml"
+      - name: "logback-xml"
+        configMap:
+          name: {{ template "apache-nifi.fullname" . }}-config
+          items:
+            - key: "logback.xml"
+              path: "logback.xml"
 {{- if .Values.certManager.enabled }}
       - name: secret-reader-token
         secret:

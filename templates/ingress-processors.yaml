@@ -1,12 +1,10 @@
 ---
-{{- if .Values.ingress.enabled -}}
+{{- if .Values.ingress.processors.enabled -}}
 {{- $fullName := include "apache-nifi.fullname" $ -}}
-{{- $ingressPath := .Values.ingress.path -}}
-{{- $ingressHttpPort := (.Values.service.httpsPort | default .Values.service.httpPort) -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ template "apache-nifi.fullname" $ }}-ingress
+  name: {{ template "apache-nifi.fullname" $ }}-ingress-processors
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ include "apache-nifi.name" . | quote }}
@@ -18,16 +16,16 @@ metadata:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.tls.options: {{ .Release.Namespace}}-{{ $fullName }}-tls-option@kubernetescrd
 {{- end }}
-{{- with .Values.ingress.annotations }}
+{{- with .Values.ingress.processors.annotations }}
 {{ toYaml . | indent 4 }}
 {{- end }}
 spec:
-{{- if .Values.ingress.className }}
-  ingressClassName: {{ .Values.ingress.className | quote }}
+{{- if .Values.ingress.processors.className }}
+  ingressClassName: {{ .Values.ingress.processors.className | quote }}
 {{- end }}
-{{- if .Values.ingress.tls }}
+{{- if .Values.ingress.processors.tls }}
   tls:
-  {{- range .Values.ingress.tls }}
+  {{- range .Values.ingress.processors.tls }}
     - hosts:
       {{- range .hosts }}
         - {{ . | quote }}
@@ -36,16 +34,18 @@ spec:
   {{- end }}
 {{- end }}
   rules:
-  {{- range .Values.ingress.hosts }}
-    - host: {{ . }}
+  {{- range .Values.ingress.processors.hosts }}
+    - host: {{ .host }}
       http:
         paths:
-          - path: {{ $ingressPath }}
-            pathType: Prefix
+        {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .type }}
             backend:
               service:
-                name: {{ $fullName }}
+                name: {{ .serviceName }}
                 port: 
-                  number: {{ $ingressHttpPort }}
+                  number: {{ .port }}
+        {{- end }}
   {{- end }}
 {{- end }}
