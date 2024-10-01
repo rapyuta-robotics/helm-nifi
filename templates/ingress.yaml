@@ -16,7 +16,7 @@ metadata:
   annotations:
 {{- if .Values.traefik.tlsOptions.enabled }}
     traefik.ingress.kubernetes.io/router.tls: "true"
-    traefik.ingress.kubernetes.io/router.tls.options: {{ .Release.Namespace}}-{{ $fullName }}-tls-option
+    traefik.ingress.kubernetes.io/router.tls.options: {{ .Release.Namespace}}-{{ $fullName }}-tls-option@kubernetescrd
 {{- end }}
 {{- with .Values.ingress.annotations }}
 {{ toYaml . | indent 4 }}
