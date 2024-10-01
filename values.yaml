@@ -260,6 +260,10 @@ traefik:
   serversTransport:
     enabled: false
     insecureSkipVerify: true
+  tlsOptions:
+    enabled: false
+    minVersion: VersionTLS12
+    maxVersion: VersionTLS12
 
 # Amount of memory to give the NiFi java heap
 jvmMemory: 2g

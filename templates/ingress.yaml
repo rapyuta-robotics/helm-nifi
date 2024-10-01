@@ -13,8 +13,12 @@ metadata:
     chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
     release: {{ .Release.Name | quote }}
     heritage: {{ .Release.Service | quote }}
-{{- with .Values.ingress.annotations }}
   annotations:
+{{- if .Values.traefik.tlsOptions.enabled }}
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.options: {{ .Release.Namespace}}-{{ $fullName }}-tls-option
+{{- end }}
+{{- with .Values.ingress.annotations }}
 {{ toYaml . | indent 4 }}
 {{- end }}
 spec:
